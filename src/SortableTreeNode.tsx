@@ -1,41 +1,66 @@
 import { Box, BoxProps } from "@mui/material";
-import { ReactNode, RefObject, memo, useRef } from "react";
+import { ReactNode, RefObject, useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { TreeDataProps } from "./DNDTree";
+import { TreeDataProps } from ".";
 
 export const INDENTATION = 40;
 
 export interface RenderNodeDisplayProps {
   isDragging: boolean;
   dragRef: RefObject<HTMLDivElement>;
-}
-
-export interface NodeProps<TData> {
-  itemTypes: string;
-  draggable: boolean;
-  children: ReactNode;
-  onDrop?: (dragId: string, locationId: string, LocationIndex: number) => void;
-  node: TreeDataProps<TData>;
-  isShowChildren: boolean;
-  findNodePlacement: (
-    nodeId: string
-  ) => { id: string; index: number } | undefined;
-  onDragCancel?: (id: string, draggedId: string, index?: number) => void;
-  isNestAble: boolean;
-  setIsShowChildren: (value: boolean) => void;
-  moveNode?: (id: string, hoverId: string) => void;
-  nestNode: (id: string, draggedId: string, index?: number) => void;
-  nodeDisplay: (value: RenderNodeDisplayProps) => ReactNode;
-  dragStyle: NodeContainerProps["dragStyle"];
+  dropRef: RefObject<HTMLDivElement>;
 }
 
 // drag drop item info
-interface Item {
+interface DraggedItem {
   id: string;
   originalIndex: number;
 }
 
-const Node = <TData,>({
+export interface SortableTreeNodeProps<TData> {
+  /** The React DND item type: https://react-dnd.github.io/react-dnd/docs/overview#items-and-types */
+  itemTypes: string;
+  /** Whether the node is currently allowed to be dragged. */
+  draggable: boolean;
+  /** Callback fired when a node is dropped onto another node. */
+  onDrop?: (
+    /** The drag id of the dropped node. */
+    dragId: string,
+    /** The id of the node that the dragged node was dropped onto. */
+    locationId: string,
+    /** The index of the node that the dragged node was dropped onto. */
+    LocationIndex: number
+  ) => void;
+  /** The data associated with the node. */
+  node: TreeDataProps<TData>;
+  /** Whether children of this node should be visible. */
+  isShowChildren: boolean;
+  /** A function that returns the id and index given a node's id. */
+  findNodePlacement: (nodeId: string) =>
+    | {
+        id: string;
+        index: number;
+      }
+    | undefined;
+  /** Callback fired when a drag ends over a non-droppable area. */
+  onDragCancel?: (id: string, draggedId: string, index?: number) => void;
+  /** Whether or not the node supports nesting. */
+  isNestable: boolean;
+  /** A state setting function for the isShowChildren prop. */
+  setIsShowChildren: (value: boolean) => void;
+  /** Callback fired when a node is moved. The id of the dragged node and the hovered node are provided as arguments to the handler. */
+  moveNode?: (id: string, hoverId: string) => void;
+  /** Callback fired when a node is nested. The id of the dragged node and the hovered node are provided as arguments to the handler. */
+  nestNode: (id: string, draggedId: string, index?: number) => void;
+  /** Render prop used to display the contents of the node. */
+  nodeDisplay: (value: RenderNodeDisplayProps) => ReactNode;
+  /** Styling applied to the dragged element as it is being moved. */
+  dragStyle: BoxProps["sx"];
+
+  children: ReactNode;
+}
+
+const SortableTreeNode = <TData,>({
   itemTypes,
   node,
   children,
@@ -45,14 +70,15 @@ const Node = <TData,>({
   onDragCancel,
   moveNode,
   nestNode, // when node is drag "INDENTATION" space to the right
-  isNestAble,
+  isNestable,
   nodeDisplay,
   onDrop,
   draggable,
   dragStyle,
-}: NodeProps<TData>) => {
+}: SortableTreeNodeProps<TData>) => {
   const { id } = node;
   const location = findNodePlacement(id); // get the parent node and its child's Index of id
+
   const dragRef = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +90,7 @@ const Node = <TData,>({
         isDragging: monitor.isDragging(),
       }),
       isDragging: (monitor) => id === monitor.getItem().id,
-      canDrag(monitor) {
+      canDrag() {
         return draggable;
       },
 
@@ -86,17 +112,23 @@ const Node = <TData,>({
   const [, drop] = useDrop(
     () => ({
       accept: itemTypes,
-      hover({ id: dragId, originalIndex }: Item, monitor) {
+      hover: ({ id: dragId }: DraggedItem, monitor) => {
         if (!dropRef.current) {
           return;
         }
 
+        if (
+          Math.abs(monitor.getInitialSourceClientOffset()?.y as number) <
+          dropRef.current.clientHeight
+        ) {
+          return;
+        }
         const hoverBoundingRect = dropRef.current.getBoundingClientRect();
         const x = monitor.getSourceClientOffset()?.x as number;
 
         // drag on the right and not it self
         if (
-          isNestAble &&
+          isNestable &&
           dragId !== id &&
           x - INDENTATION > hoverBoundingRect.x
         ) {
@@ -111,15 +143,20 @@ const Node = <TData,>({
           moveNode(dragId, node.id);
         }
       },
-      drop(item, monitor) {
+      drop: (item) => {
         // event when drop inside of container
-        if (onDrop && location) {
+        if (onDrop) {
+          const location = findNodePlacement(item.id);
+          if (!location) {
+            throw new Error("i am error on drop");
+          }
           onDrop(item.id, location.id, location.index);
         }
       },
     }),
     [
       id,
+      location,
       findNodePlacement,
       moveNode,
       nestNode,
@@ -133,31 +170,6 @@ const Node = <TData,>({
   drag(dragRef);
   drop(dropRef);
 
-  return (
-    <NodeContainer isDragging={isDragging} dragStyle={dragStyle}>
-      <Box ref={preview}>
-        <Box ref={dropRef}>{nodeDisplay({ dragRef, isDragging })}</Box>
-      </Box>
-
-      <ChildrenNode isDragging={isDragging} isShowChildren={isShowChildren}>
-        {children}
-      </ChildrenNode>
-    </NodeContainer>
-  );
-};
-
-export default memo(Node);
-
-export interface NodeContainerProps {
-  children: ReactNode;
-  isDragging: boolean;
-  dragStyle?: BoxProps["sx"];
-}
-const NodeContainer = ({
-  children,
-  isDragging,
-  dragStyle,
-}: NodeContainerProps) => {
   return (
     <Box
       sx={[
@@ -176,32 +188,20 @@ const NodeContainer = ({
           : []),
       ]}
     >
-      {children}
+      <Box ref={preview}>{nodeDisplay({ dragRef, isDragging, dropRef })}</Box>
+
+      {isShowChildren && (
+        <Box
+          style={{
+            marginLeft: `${INDENTATION}px`,
+            pointerEvents: isDragging ? "none" : undefined,
+          }}
+        >
+          {children}
+        </Box>
+      )}
     </Box>
   );
 };
 
-interface ChildrenNodeProps {
-  children: ReactNode;
-  isShowChildren: boolean;
-  isDragging: boolean;
-}
-
-const ChildrenNode = ({
-  children,
-  isShowChildren,
-  isDragging,
-}: ChildrenNodeProps) => {
-  return isShowChildren ? (
-    <Box
-      style={{
-        marginLeft: `${INDENTATION}px`,
-        pointerEvents: isDragging ? "none" : undefined,
-      }}
-    >
-      {children}
-    </Box>
-  ) : (
-    <></>
-  );
-};
+export default SortableTreeNode;

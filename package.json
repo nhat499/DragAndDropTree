@@ -1,21 +1,25 @@
 {
   "name": "draganddroptree",
-  "private": true,
+  "author": "Nhat Trang",
+  "license": "MIT",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npx rollup -c",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "@mui/material": "^5.15.3",
-    "react": "^18.2.0",
-    "react-dnd": "^16.0.1",
-    "react-dom": "^18.2.0"
+  "peerDependencies": {
+    "react": ">=15.0.1",
+    "react-dom": ">=15.0.1"
   },
   "devDependencies": {
+    "@mui/material": "^5.15.3",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
@@ -24,7 +28,15 @@
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "react": "^18.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dom": "^18.2.0",
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
+  },
+  "dependencies": {
+    "@storybook/react": "^7.6.12",
+    "react-dnd-html5-backend": "^16.0.1",
+    "rollup": "^4.9.2"
   }
 }

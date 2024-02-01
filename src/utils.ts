@@ -1,4 +1,4 @@
-import { TreeDataProps } from "./DNDTree";
+import { TreeDataProps } from ".";
 
 export interface FoundNode<TData> {
   parentNode: TreeDataProps<TData>;
@@ -71,19 +71,3 @@ export const findNodeIndex = <TData>(
   }
   return res;
 };
-
-export function deleteSelectedNode<TData>(
-  treeData: TreeDataProps<TData>,
-  selectedNode: { [key: string]: string } | string[],
-  previous?: TreeDataProps<TData>,
-  currIndex?: number
-) {
-  if (treeData.id in selectedNode && currIndex !== undefined && previous) {
-    previous.children.splice(currIndex, 1);
-  } else {
-    for (let i = treeData.children.length - 1; i >= 0; i--) {
-      const node = treeData.children[i];
-      deleteSelectedNode(node, selectedNode, treeData, i);
-    }
-  }
-}
